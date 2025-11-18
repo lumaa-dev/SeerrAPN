@@ -26,8 +26,10 @@ const app = express();
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
-app.get("/", (_, res) => {
-	res.status(200).send("Hello from SeerrAPN.");
+app.get("/", (req, res) => {
+	if (req.headers.authorization != process.env.AUTH)
+		return res.status(403).json({ message: "Forbidden", success: false });
+	else return res.status(200).send("Hello from SeerrAPN.");
 });
 
 app.post("/token", async (req, res) => {
@@ -82,25 +84,27 @@ app.delete("/token", async (req, res) => {
 	if (!isUnbound(req.body.deviceToken)) {
 		let bodytype: DBDevice = req.body as DBDevice; // it's `DBDevice` but without `id`
 
-		if (!(await hasTokened(pool, bodytype.deviceToken))) {
+		if (await hasTokened(pool, bodytype.deviceToken)) {
+			pool.query(
+				`DELETE FROM apn WHERE deviceToken = '${bodytype.deviceToken}';`,
+				(err: QueryError | null, result: QueryResult) => {
+					if (err) {
+						console.error(err);
+						return res
+							.status(400)
+							.json({ message: err.message, success: false });
+					}
+
+					if (result) {
+						return res.status(200).json({ success: true });
+					}
+				}
+			);
+		} else {
 			return res
 				.status(400)
 				.json({ message: "Token isn't tokened", success: false });
 		}
-
-		pool.query(
-			`DELETE FROM apn WHERE deviceToken = '${bodytype.deviceToken}';`,
-			(err: QueryError | null, result: QueryResult) => {
-				if (err) {
-					console.error(err);
-					return res.status(400).json({ message: err.message, success: false });
-				}
-
-				if (result) {
-					return res.status(200).json({ success: true });
-				}
-			}
-		);
 	} else {
 		return res
 			.status(400)
