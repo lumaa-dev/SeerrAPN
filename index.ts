@@ -32,16 +32,20 @@ app.get("/", (_, res) => {
 
 app.post("/token", async (req, res) => {
 	if (req.headers.authorization != process.env.AUTH)
-		return res.status(403).json({ message: "Forbidden" });
+		return res.status(403).json({ message: "Forbidden", success: false });
 
 	if (isUnbound(req.body))
-		return res.status(400).json({ message: "Request has no body" });
+		return res
+			.status(400)
+			.json({ message: "Request has no body", success: false });
 
 	if (!isUnbound(req.body.deviceToken) && !isUnbound(req.body.accountId)) {
 		let bodytype: DBDevice = req.body as DBDevice; // it's `DBDevice` but without `id`
 
 		if (await hasTokened(pool, bodytype.deviceToken)) {
-			return res.status(400).json({ message: "Already tokened" });
+			return res
+				.status(400)
+				.json({ message: "Already tokened", success: false });
 		}
 
 		pool.query(
@@ -51,16 +55,18 @@ app.post("/token", async (req, res) => {
 			(err: QueryError | null, result: QueryResult) => {
 				if (err) {
 					console.error(err);
-					return res.status(400).json({ message: err.message });
+					return res.status(400).json({ message: err.message, success: false });
 				}
 
 				if (result) {
-					return res.status(201).send();
+					return res.status(200).json({ success: true });
 				}
 			}
 		);
 	} else {
-		return res.status(400).json({ message: "Request is missing data" });
+		return res
+			.status(400)
+			.json({ message: "Request is missing data", success: false });
 	}
 });
 
@@ -73,10 +79,12 @@ app.post("/apn", (req, res) => {
 	// - Request Declined
 
 	if (req.headers.authorization != process.env.AUTH)
-		return res.status(403).json({ message: "Forbidden" });
+		return res.status(403).json({ message: "Forbidden", success: false });
 
 	if (isUnbound(req.body))
-		return res.status(400).json({ message: "Request has no body" });
+		return res
+			.status(400)
+			.json({ message: "Request has no body", success: false });
 
 	if (!isUnbound(req.body.notification_type)) {
 		let bodytype: SeerrNotification = req.body as SeerrNotification;
@@ -92,7 +100,9 @@ app.post("/apn", (req, res) => {
 				async (err: QueryError, result: QueryResult) => {
 					if (err) {
 						console.error(err);
-						return res.status(400).json({ message: err.message });
+						return res
+							.status(400)
+							.json({ message: err.message, success: false });
 					}
 
 					if (result) {
@@ -115,23 +125,21 @@ app.post("/apn", (req, res) => {
 								);
 							}
 						}
+
+						return res.status(200).json({ success: true });
 					}
 				}
 			);
-
-			return res.status(200).json({
-				requestedBy: bodytype.request?.requestedBy_username,
-				title: bodytype.subject,
-				message: bodytype.message,
-			});
 		} else {
 			console.log(`Non-supported notification (${bodytype.notification_type})`);
-			return res.status(400).json({ message: "Unsupported notification type" });
+			return res
+				.status(400)
+				.json({ message: "Unsupported notification type", success: false });
 		}
 	} else {
 		return res
 			.status(400)
-			.json({ message: "Request is probably not from Seerr" });
+			.json({ message: "Request is probably not from Seerr", success: false });
 	}
 });
 
