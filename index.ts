@@ -36,15 +36,20 @@ app.post("/token", async (req, res) => {
 	if (req.headers.authorization != process.env.AUTH)
 		return res.status(403).json({ message: "Forbidden", success: false });
 
-	if (isUnbound(req.body))
+	if (isUnbound(req.body)) {
+		console.log(`[POST /token] Request has no body`);
+
 		return res
 			.status(400)
 			.json({ message: "Request has no body", success: false });
+	}
 
 	if (!isUnbound(req.body.deviceToken)) {
 		let bodytype: DBDevice = req.body as DBDevice; // it's `DBDevice` but without `id`
 
 		if (await hasTokened(pool, bodytype.deviceToken)) {
+			console.log(`[POST /token] Already tokened`);
+
 			return res
 				.status(400)
 				.json({ message: "Already tokened", success: false });
@@ -61,11 +66,14 @@ app.post("/token", async (req, res) => {
 				}
 
 				if (result) {
+					console.log(`[POST /apn] Added token to database`);
 					return res.status(200).json({ success: true });
 				}
 			}
 		);
 	} else {
+		console.log(`[POST /token] Request is missing data`);
+
 		return res
 			.status(400)
 			.json({ message: "Request is missing data", success: false });
@@ -76,10 +84,13 @@ app.delete("/token", async (req, res) => {
 	if (req.headers.authorization != process.env.AUTH)
 		return res.status(403).json({ message: "Forbidden", success: false });
 
-	if (isUnbound(req.body))
+	if (isUnbound(req.body)) {
+		console.log(`[DELETE /apn] Request has no body`);
+
 		return res
 			.status(400)
 			.json({ message: "Request has no body", success: false });
+	}
 
 	if (!isUnbound(req.body.deviceToken)) {
 		let bodytype: DBDevice = req.body as DBDevice; // it's `DBDevice` but without `id`
@@ -101,6 +112,8 @@ app.delete("/token", async (req, res) => {
 				}
 			);
 		} else {
+			console.log(`[DELETE /apn] Token isn't tokened`);
+
 			return res
 				.status(400)
 				.json({ message: "Token isn't tokened", success: false });
@@ -123,10 +136,13 @@ app.post("/apn", (req, res) => {
 	if (req.headers.authorization != process.env.AUTH)
 		return res.status(403).json({ message: "Forbidden", success: false });
 
-	if (isUnbound(req.body))
+	if (isUnbound(req.body)) {
+		console.log(`[POST /apn] Reques has no body`);
+
 		return res
 			.status(400)
 			.json({ message: "Request has no body", success: false });
+	}
 
 	if (!isUnbound(req.body.notification_type)) {
 		let bodytype: SeerrNotification = req.body as SeerrNotification;
@@ -168,12 +184,17 @@ app.post("/apn", (req, res) => {
 							}
 						}
 
+						console.log(
+							`[POST /apn] Sent ${typenotif} to ${typeresult.length} tokens`
+						);
 						return res.status(200).json({ success: true });
 					}
 				}
 			);
 		} else {
-			console.log(`Non-supported notification (${bodytype.notification_type})`);
+			console.log(
+				`[POST /apn] Non-supported notification (${bodytype.notification_type})`
+			);
 			return res
 				.status(400)
 				.json({ message: "Unsupported notification type", success: false });
