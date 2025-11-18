@@ -1,0 +1,21 @@
+name: Build SeerrAPN
+on: [push]
+
+jobs:
+    build-seerrapn:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v3
+            - name: Set up Node.js
+              uses: actions/setup-node@v2
+              with:
+                  node-version: "22"
+            - name: Install dependencies & Build
+              run: npm install && npm run build
+            - name: Upload zip file
+              uses: actions/upload-artifact@v4
+              with:
+                  name: seerr-apn
+                  path: ${{ github.workspace }}/SeerrAPN.zip
+                  if-no-files-found: error
