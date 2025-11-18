@@ -1,0 +1,11 @@
+services:
+  node:
+    image: "node:22"
+    working_dir: /home/node/app
+    environment:
+      - NODE_ENV=production
+    volumes:
+      - ./:/home/node/app
+    ports:
+      - "3000:3000" # change the port according to the one in the .env file
+    command: sh -c "npm install && node server/index.js"

@@ -1,0 +1,11 @@
+# node
+node_modules
+package-lock.json
+bun.lockb
+
+# builds
+server/*
+
+# private
+.env
+*.p8

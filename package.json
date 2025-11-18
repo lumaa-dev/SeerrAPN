@@ -1,0 +1,22 @@
+{
+	"name": "seerr-apn",
+	"version": "1.0.0",
+	"type": "module",
+	"scripts": {
+		"dev": "node --loader ts-node/esm ./index.ts",
+		"build": "rm -rf ./server && tsc && zip SeerrAPN.zip server/* docker-compose.yml .env package.json",
+		"start": "rm -rf ./server && tsc && node server/index.js"
+	},
+	"dependencies": {
+		"@parse/node-apn": "^6.5.0",
+		"dotenv": "^17.2.3",
+		"express": "^5.1.0",
+		"mysql2": "^3.15.3"
+	},
+	"devDependencies": {
+		"@types/express": "^5.0.5",
+		"@types/node": "^24.10.1",
+		"ts-node": "^10.9.2",
+		"typescript": "^5.9.3"
+	}
+}
