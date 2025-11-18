@@ -39,7 +39,7 @@ app.post("/token", async (req, res) => {
 			.status(400)
 			.json({ message: "Request has no body", success: false });
 
-	if (!isUnbound(req.body.deviceToken) && !isUnbound(req.body.accountId)) {
+	if (!isUnbound(req.body.deviceToken)) {
 		let bodytype: DBDevice = req.body as DBDevice; // it's `DBDevice` but without `id`
 
 		if (await hasTokened(pool, bodytype.deviceToken)) {
@@ -52,6 +52,44 @@ app.post("/token", async (req, res) => {
 			`INSERT INTO apn (deviceToken, notify) VALUES ('${
 				bodytype.deviceToken
 			}', ${bodytype.notify ?? 7});`,
+			(err: QueryError | null, result: QueryResult) => {
+				if (err) {
+					console.error(err);
+					return res.status(400).json({ message: err.message, success: false });
+				}
+
+				if (result) {
+					return res.status(200).json({ success: true });
+				}
+			}
+		);
+	} else {
+		return res
+			.status(400)
+			.json({ message: "Request is missing data", success: false });
+	}
+});
+
+app.delete("/token", async (req, res) => {
+	if (req.headers.authorization != process.env.AUTH)
+		return res.status(403).json({ message: "Forbidden", success: false });
+
+	if (isUnbound(req.body))
+		return res
+			.status(400)
+			.json({ message: "Request has no body", success: false });
+
+	if (!isUnbound(req.body.deviceToken)) {
+		let bodytype: DBDevice = req.body as DBDevice; // it's `DBDevice` but without `id`
+
+		if (!(await hasTokened(pool, bodytype.deviceToken))) {
+			return res
+				.status(400)
+				.json({ message: "Token isn't tokened", success: false });
+		}
+
+		pool.query(
+			`DELETE FROM apn WHERE deviceToken = '${bodytype.deviceToken}';`,
 			(err: QueryError | null, result: QueryResult) => {
 				if (err) {
 					console.error(err);
