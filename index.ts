@@ -29,7 +29,12 @@ app.use(express.json());
 app.get("/", (req, res) => {
 	if (req.headers.authorization != process.env.AUTH)
 		return res.status(403).json({ message: "Forbidden", success: false });
-	else return res.status(200).send("Hello from SeerrAPN.");
+	else
+		return res.status(200).json({
+			success: true,
+			message: "Hello from SeerrAPN",
+			version: "1.0.0",
+		});
 });
 
 app.post("/token", async (req, res) => {
