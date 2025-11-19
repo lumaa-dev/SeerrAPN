@@ -125,6 +125,52 @@ app.delete("/token", async (req, res) => {
 	}
 });
 
+app.post("/notify", async (req, res) => {
+	if (req.headers.authorization != process.env.AUTH)
+		return res.status(403).json({ message: "Forbidden", success: false });
+
+	if (isUnbound(req.body)) {
+		console.log(`[POST /notify] Reques has no body`);
+
+		return res
+			.status(400)
+			.json({ message: "Request has no body", success: false });
+	}
+
+	if (!isUnbound(req.body.deviceToken) && !isUnbound(req.body.notify)) {
+		let bodytype: DBDevice = req.body as DBDevice; // it's `DBDevice` but without `id`
+
+		if (await hasTokened(pool, bodytype.deviceToken)) {
+			pool.query(
+				`UPDATE apn SET notify = ${bodytype.notify} WHERE deviceToken = '${bodytype.deviceToken}';`,
+				(err: QueryError, result: QueryResult) => {
+					if (err) {
+						console.error(err);
+						return res
+							.status(400)
+							.json({ message: err.message, success: false });
+					}
+
+					if (result) {
+						return res.status(200).json({ success: true });
+					}
+				}
+			);
+		} else {
+			console.log("[POST /notify] Token isn't tokened");
+
+			return res
+				.status(400)
+				.json({ message: "Token isn't tokened", success: false });
+		}
+	} else {
+		return res
+			.status(400)
+			.json({ message: "Request is missing data", success: false });
+	}
+});
+
+// This is the URL that gets requested when a webhook is sent from Seerr
 app.post("/apn", (req, res) => {
 	// sends notification to device (via SQL + cache)
 
