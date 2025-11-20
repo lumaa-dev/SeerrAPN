@@ -4,13 +4,13 @@ SeerrAPN is an [APN](https://d.lumaa.fr/AosqMi) service for [Seerr](https://gith
 
 ## Features
 
-# Events supported
+### Events supported
 
 - New Request
 - Request Denied
 - Movie/Show Available
 
-# Filters
+### Filters
 
 You can make it so that users have only specific notifications:
 
