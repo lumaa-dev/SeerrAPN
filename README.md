@@ -1,6 +1,6 @@
 # SeerrAPN
 
-SeerrAPN is an [APN](https://d.lumaa.fr/AosqMi) service for [Seerr](https://github.com/seerr-team/seerr).
+SeerrAPN is an [APN](https://d.lumaa.fr/AosqMi) (Apple Push Notification) service using [Seerr](https://github.com/seerr-team/seerr)'s webhooks.
 
 ## Features
 
@@ -19,6 +19,8 @@ You can make it so that users have only specific notifications:
 - Request Denied: `2`
 - Movie/Show Available: `4`
 
+These don't include Seerr's default `TEST_NOTIFICATION`, which will always be sent whatever the filter.
+
 ## Running
 
 To make SeerrAPN work follow these steps:
@@ -28,3 +30,7 @@ To make SeerrAPN work follow these steps:
 3. Change the `.env` file to your wish
 4. Run `node server/index.js` or use Docker Compose with `docker-compose.yml`
 5. Set the webhook URL as `http://localhost:3000/apn` (or with your chosen port) and fill in the _Authorization Header_ with the one you chose
+
+---
+
+© Lumaa 2025
