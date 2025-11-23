@@ -197,13 +197,11 @@ app.post("/apn", (req, res) => {
 
 	if (!isUnbound(req.body.notification_type)) {
 		let bodytype: SeerrNotification = req.body as SeerrNotification;
-		const supported =
-			bodytype.notification_type == NotificationType.MEDIA_PENDING ||
-			bodytype.notification_type == NotificationType.MEDIA_AVAILABLE ||
-			bodytype.notification_type == NotificationType.MEDIA_DECLINED ||
-			bodytype.notification_type == NotificationType.TEST_NOTIFICATION;
+		const isSupported = NotificationType.supported
+			.map((s) => s.toString())
+			.includes(bodytype.notification_type);
 
-		if (supported) {
+		if (isSupported) {
 			pool.query(
 				`SELECT * FROM apn`,
 				async (err: QueryError, result: QueryResult) => {

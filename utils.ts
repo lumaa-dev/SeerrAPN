@@ -56,6 +56,13 @@ export namespace NotificationType {
 		NotificationType.MEDIA_AUTO_REQUESTED,
 	];
 
+	export const supported: NotificationType[] = [
+		NotificationType.MEDIA_PENDING,
+		NotificationType.MEDIA_AVAILABLE,
+		NotificationType.MEDIA_DECLINED,
+		NotificationType.TEST_NOTIFICATION,
+	];
+
 	export function from(string: string): NotificationType | undefined {
 		return NotificationType.allCases.filter((type) => type == string)[0];
 	}
@@ -99,7 +106,7 @@ interface SeerrNotificationRequest {
 export interface DBDevice {
 	/** The MySQL auto-incrementing identifier, shouldn't be used elsewhere than in the database */
 	id: number;
-	/** The iOS device token for notifications linked to the Jellyseerr account */
+	/** The iOS device token for notifications */
 	deviceToken: string;
 	/** The notification filter integer */
 	notify: number;
