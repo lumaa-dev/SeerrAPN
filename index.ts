@@ -225,11 +225,17 @@ app.post("/apn", (req, res) => {
 								getFilters(seerr.notify).includes(typefilter) ||
 								typenotif == NotificationType.TEST_NOTIFICATION
 							) {
-								await sendTypedNotification(
+								let result = await sendTypedNotification(
 									seerr.deviceToken,
 									bodytype,
 									typenotif
 								);
+
+								if (result.failed.length > 0) {
+									for (const failure of result.failed) {
+										console.error(`[POST /apn] Error ${failure.device}: ${failure.response?.reason ?? "Unknown error"}`);
+									}
+								}
 							}
 						}
 
