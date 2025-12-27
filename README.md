@@ -9,6 +9,7 @@ SeerrAPN is an [APN](https://d.lumaa.fr/AosqMi) (Apple Push Notification) servic
 - New Request
 - Request Denied
 - Movie/Show Available
+- Request Automatically Approved
 
 ### Filters
 
@@ -18,6 +19,7 @@ You can make it so that users have only specific notifications:
 - New Request: `1`
 - Request Denied: `2`
 - Movie/Show Available: `4`
+- Request Automatically Approved: `8`
 
 These don't include Seerr's default `TEST_NOTIFICATION`, which will always be sent whatever the filter.
 

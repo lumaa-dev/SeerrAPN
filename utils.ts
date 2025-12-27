@@ -58,6 +58,7 @@ export namespace NotificationType {
 
 	export const supported: NotificationType[] = [
 		NotificationType.MEDIA_PENDING,
+		NotificationType.MEDIA_AUTO_APPROVED,
 		NotificationType.MEDIA_AVAILABLE,
 		NotificationType.MEDIA_DECLINED,
 		NotificationType.TEST_NOTIFICATION,
@@ -180,6 +181,7 @@ export enum NotificationFilter {
 	requestPending = 1,
 	requestAvailable = 2,
 	requestDeclined = 4,
+	requestAutoApproved = 8
 }
 
 export namespace NotificationFilter {
@@ -188,6 +190,7 @@ export namespace NotificationFilter {
 		NotificationFilter.requestPending,
 		NotificationFilter.requestAvailable,
 		NotificationFilter.requestDeclined,
+		NotificationFilter.requestAutoApproved
 	];
 
 	export function from(type: NotificationType): NotificationFilter | undefined {
@@ -203,6 +206,9 @@ export namespace NotificationFilter {
 
 			case NotificationType.MEDIA_DECLINED:
 				return NotificationFilter.requestDeclined;
+			
+			case NotificationType.MEDIA_AUTO_APPROVED:
+				return NotificationFilter.requestAutoApproved
 
 			default:
 				return;
@@ -241,6 +247,10 @@ export async function sendTypedNotification(
 			key = "notification.media_declined-%@"; // media
 			params = [data.subject];
 			break;
+		case NotificationType.MEDIA_AUTO_APPROVED:
+			key = "notification.media_auto_approved-%1$@.%2$@"; // 1 is user, 2 is media
+			params = [data.request?.requestedBy_username ?? "User", data.subject];
+			break;
 		default:
 			key = "error.unknown";
 			break;
@@ -251,37 +261,6 @@ export async function sendTypedNotification(
 		key,
 		params,
 	});
-}
-
-/**
- * Send a push notification to a device using its device token
- * @param deviceToken The device token of the receiver
- * @param content The content of the notification that will be sent to the user
- * @returns The response(s) given back from Apple's servers
- */
-async function sendNotification(
-	deviceToken: string,
-	content: { badge: number; text: string } = { badge: 0, text: "Hello, user!" }
-): Promise<Responses<ResponseSent, ResponseFailure>> {
-	if (provider == null) {
-		provider = new Provider({
-			production: false,
-			token: {
-				key: findP8file() ?? "AuthKey_" + process.env.KEY_ID + ".p8",
-				keyId: process.env.KEY_ID ?? "",
-				teamId: process.env.TEAM_ID ?? "",
-			},
-		});
-	}
-	let notif = new Notification();
-
-	notif.badge = content.badge;
-	notif.sound = "default";
-	notif.alert = content.text;
-	notif.topic = "fr.lumaa.Swiftseerr"; // App Bundle
-
-	let result = await provider.send(notif, deviceToken);
-	return result;
 }
 
 /**
@@ -317,7 +296,7 @@ async function sendLocalizedNotification(
 	} else {
 		notif.aps.alert = { "loc-key": content.key, "loc-args": content.params };
 	}
-	notif.topic = "fr.lumaa.Swiftseerr"; // App Bundle
+	notif.topic = process.env.APP_BUNDLE ?? "fr.lumaa.Swiftseerr"; // App Bundle
 
 	let result = await provider.send(notif, deviceToken);
 	return result;
