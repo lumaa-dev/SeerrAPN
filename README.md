@@ -1,4 +1,7 @@
-# SeerrAPN
+<div align="center">
+    <h1>SeerrAPN</h1>
+    <img width=128 src="./.github/assets/SwiftseerrBadge.png" />
+</div>
 
 SeerrAPN is an [APN](https://d.lumaa.fr/AosqMi) (Apple Push Notification) service using [Seerr](https://github.com/seerr-team/seerr)'s webhooks.
 
@@ -21,7 +24,15 @@ You can make it so that users have only specific notifications:
 - Movie/Show Available: `4`
 - Request Automatically Approved: `8`
 
-These don't include Seerr's default `TEST_NOTIFICATION`, which will always be sent whatever the filter.
+To filter multiple notifications, simply add the number matching the notification like so:
+```
+- Request Denied: 2
+- Request Automatically Approved: 8
+
+2 + 8 = 10
+```
+
+You cannot filter out the `TEST_NOTIFICATION`, accessible by a Seerr administrator.
 
 ## Running
 
@@ -31,7 +42,7 @@ To make SeerrAPN work follow these steps:
 2. Generate an APN [Certificate](https://developer.apple.com/account/resources/certificates/list)
 3. Change the `.env` file to your wish
 4. Run `node server/index.js` or use Docker Compose with `docker-compose.yml`
-5. Set the webhook URL as `http://localhost:3000/apn` (or with your chosen port/URL) and fill in the _Authorization Header_ with the one you chose
+5. Set the Seerr webhook URL as `http://localhost:3000/apn` (or with your chosen port/URL) and fill in the _Authorization Header_ with the one you chose
 
 ## Subscribe using [Swiftseerr](https://d.lumaa.fr/swiftseerr)
 
