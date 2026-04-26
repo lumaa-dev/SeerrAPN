@@ -173,6 +173,7 @@ export function hasTokened(pool: Pool, token: string): Promise<boolean> {
  * - Request Pending Approval
  * - Request Available
  * - Request Declined
+ * - Request Auto Approved
  *
  * This allows users to get notifications for only specific types. It should go from 0 to 7 (normally)
  */
