@@ -7,9 +7,11 @@ import {
 	ResponseSent,
 	ResponseFailure,
 } from "@parse/node-apn";
-import { Pool, QueryError, QueryResult } from "mysql2";
+import { Pool, QueryResult, ResultSetHeader, RowDataPacket } from "mysql2";
 
-var provider: Provider | null = null;
+let provider: Provider | null = null;
+const DEFAULT_APP_BUNDLE = "fr.lumaa.Swiftseerr";
+const DEVICE_TOKEN_PATTERN = /^[0-9a-fA-F]{64}$/;
 
 // MARK: - Seerr Utils
 
@@ -65,7 +67,7 @@ export namespace NotificationType {
 	];
 
 	export function from(string: string): NotificationType | undefined {
-		return NotificationType.allCases.filter((type) => type == string)[0];
+		return NotificationType.allCases.find((type) => type === string);
 	}
 }
 
@@ -104,7 +106,7 @@ interface SeerrNotificationRequest {
 
 // MARK: - Database Utils
 
-export interface DBDevice {
+export interface DBDevice extends RowDataPacket {
 	/** The MySQL auto-incrementing identifier, shouldn't be used elsewhere than in the database */
 	id: number;
 	/** The iOS device token for notifications */
@@ -118,7 +120,7 @@ export interface DBDevice {
  * @returns {number}
  */
 export function getFilter(filters: NotificationFilter[]): number {
-	var total: number = 0;
+	let total = 0;
 	for (const filter of filters) {
 		total += filter;
 	}
@@ -133,7 +135,7 @@ export function getFilter(filters: NotificationFilter[]): number {
 export function getFilters(from: number): NotificationFilter[] {
 	if (from <= 0) return [];
 
-	var total: NotificationFilter[] = [];
+	const total: NotificationFilter[] = [];
 	for (const filter of NotificationFilter.allCases) {
 		if ((from & filter) !== 0) {
 			total.push(filter);
@@ -149,22 +151,48 @@ export function getFilters(from: number): NotificationFilter[] {
  * @param token The device token that wants to get tokened
  * @returns `true` if it's tokened, otherwise `false`
  */
-export function hasTokened(pool: Pool, token: string): Promise<boolean> {
-	return new Promise((resolve, reject) => {
-		pool.query(
-			`SELECT id FROM apn WHERE deviceToken = '${token}'`,
-			(err: QueryError, result: QueryResult) => {
-				if (err) {
-					reject(err);
-				}
+export async function hasTokened(pool: Pool, token: string): Promise<boolean> {
+	const rows = await queryRows<Pick<DBDevice, "id">>(
+		pool,
+		"SELECT id FROM apn WHERE deviceToken = ? LIMIT 1",
+		[token],
+	);
 
-				if (result) {
-					resolve((result as any).length > 0);
-				} else {
-					reject();
-				}
+	return rows.length > 0;
+}
+
+export async function queryRows<T>(
+	pool: Pool,
+	query: string,
+	values: unknown[] = [],
+): Promise<T[]> {
+	const result = await runQuery(pool, query, values);
+	return result as T[];
+}
+
+export async function executeStatement(
+	pool: Pool,
+	query: string,
+	values: unknown[] = [],
+): Promise<ResultSetHeader> {
+	const result = await runQuery(pool, query, values);
+	return result as ResultSetHeader;
+}
+
+function runQuery(
+	pool: Pool,
+	query: string,
+	values: unknown[],
+): Promise<QueryResult> {
+	return new Promise((resolve, reject) => {
+		pool.execute(query, values, (err, result) => {
+			if (err != null) {
+				reject(err);
+				return;
 			}
-		);
+
+			resolve(result);
+		});
 	});
 }
 
@@ -182,7 +210,7 @@ export enum NotificationFilter {
 	requestPending = 1,
 	requestAvailable = 2,
 	requestDeclined = 4,
-	requestAutoApproved = 8
+	requestAutoApproved = 8,
 }
 
 export namespace NotificationFilter {
@@ -191,7 +219,7 @@ export namespace NotificationFilter {
 		NotificationFilter.requestPending,
 		NotificationFilter.requestAvailable,
 		NotificationFilter.requestDeclined,
-		NotificationFilter.requestAutoApproved
+		NotificationFilter.requestAutoApproved,
 	];
 
 	export function from(type: NotificationType): NotificationFilter | undefined {
@@ -207,9 +235,9 @@ export namespace NotificationFilter {
 
 			case NotificationType.MEDIA_DECLINED:
 				return NotificationFilter.requestDeclined;
-			
+
 			case NotificationType.MEDIA_AUTO_APPROVED:
-				return NotificationFilter.requestAutoApproved
+				return NotificationFilter.requestAutoApproved;
 
 			default:
 				return;
@@ -217,20 +245,22 @@ export namespace NotificationFilter {
 	}
 }
 
-// MARK: - General Utils
+const MAX_NOTIFY_FILTER =
+	NotificationFilter.requestPending |
+	NotificationFilter.requestAvailable |
+	NotificationFilter.requestDeclined |
+	NotificationFilter.requestAutoApproved;
 
-export function isUnbound(variable: any): boolean {
-	return typeof variable == "undefined" || variable == null;
-}
+// MARK: - Notification Utils
 
 export async function sendTypedNotification(
-	deviceToken: string,
+	deviceToken: string | string[],
 	data: SeerrNotification,
-	type: NotificationType
+	type: NotificationType,
 ): Promise<Responses<ResponseSent, ResponseFailure>> {
-	var key: string;
-	var params: string[] = [];
-	var badge: number = 0;
+	let key: string;
+	let params: string[] = [];
+	let badge = 0;
 	switch (type) {
 		case NotificationType.TEST_NOTIFICATION:
 			key = "notification.test";
@@ -265,67 +295,141 @@ export async function sendTypedNotification(
 }
 
 /**
+ * Send a push notification to a device using its device token
+ * @param deviceToken The device token of the receiver
+ * @param content The content of the notification that will be sent to the user
+ * @returns The response(s) given back from Apple's servers
+ */
+export async function sendStaticNotification(
+	deviceToken: string | string[],
+	content: { badge: number; message: string },
+): Promise<Responses<ResponseSent, ResponseFailure>> {
+	const notificationProvider = getProvider();
+	const notif = new Notification();
+
+	notif.badge = content.badge;
+	notif.sound = "default";
+	notif.alert = content.message;
+	notif.topic = process.env.APP_BUNDLE ?? DEFAULT_APP_BUNDLE;
+
+	return await notificationProvider.send(notif, deviceToken);
+}
+
+/**
  * Send a localized push notification to a device using its device token
  * @param deviceToken The device token of the receiver
  * @param content The content of the notification that will be sent to the user
  * @returns The response(s) given back from Apple's servers
  */
 async function sendLocalizedNotification(
-	deviceToken: string,
+	deviceToken: string | string[],
 	content: { badge: number; key: string; params?: string[] } = {
 		badge: 0,
 		key: "error.unknown",
 		params: undefined,
-	}
+	},
 ): Promise<Responses<ResponseSent, ResponseFailure>> {
+	const notificationProvider = getProvider();
+	const notif = new Notification();
+
+	notif.badge = content.badge;
+	notif.sound = "default";
+	notif.aps.alert = { "loc-key": content.key, "loc-args": content.params };
+	notif.topic = process.env.APP_BUNDLE ?? DEFAULT_APP_BUNDLE;
+
+	return await notificationProvider.send(notif, deviceToken);
+}
+
+function getProvider(): Provider {
 	if (provider == null) {
 		provider = new Provider({
 			production: false,
 			token: {
-				key: findP8file() ?? "AuthKey_" + process.env.KEY_ID + ".p8",
+				key: findP8file() ?? `AuthKey_${process.env.KEY_ID ?? ""}.p8`,
 				keyId: process.env.KEY_ID ?? "",
 				teamId: process.env.TEAM_ID ?? "",
 			},
 		});
 	}
-	let notif = new Notification();
 
-	notif.badge = content.badge;
-	notif.sound = "default";
-	if (content.params && Array.isArray(content.params)) {
-		notif.aps.alert = { "loc-key": content.key, "loc-args": content.params };
-	} else {
-		notif.aps.alert = { "loc-key": content.key, "loc-args": content.params };
-	}
-	notif.topic = process.env.APP_BUNDLE ?? "fr.lumaa.Swiftseerr"; // App Bundle
-
-	let result = await provider.send(notif, deviceToken);
-	return result;
+	return provider;
 }
 
 function findP8file(): string | undefined {
 	try {
-		const projectRoot = resolve(process.cwd() + process.env.KEY_DIR); // Current working directory (project root when run via CLI)
+		const keyDirectory = process.env.KEY_DIR ?? ".";
+		const projectRoot = resolve(process.cwd(), keyDirectory);
 		const files = readdirSync(projectRoot);
-
 		const p8files = files.filter((file) => file.endsWith(".p8"));
 
-		if (p8files.length === 1) {
-			return p8files[0];
+		if (p8files.length === 0) {
+			return;
 		}
 
-		// warn use first
 		if (p8files.length > 1) {
 			console.warn(
 				`Warning: Multiple .p8 files found: ${p8files.join(
-					", "
-				)}. Using the first one now.`
+					", ",
+				)}. Using the first one now.`,
 			);
 		}
 
-		return p8files[0];
+		return resolve(projectRoot, p8files[0]);
 	} catch (err) {
 		console.error("Error:", err);
 		return;
 	}
+}
+
+// MARK: - General Utils
+
+export function isUnbound(variable: unknown): boolean {
+	return typeof variable === "undefined" || variable == null;
+}
+
+export function parseDeviceToken(value: unknown): string | null {
+	if (typeof value !== "string") {
+		return null;
+	}
+
+	const normalized = value.replace(/[<>\s]/g, "").trim();
+	if (!DEVICE_TOKEN_PATTERN.test(normalized)) {
+		return null;
+	}
+
+	return normalized;
+}
+
+export function parseNotifyFilter(value: unknown): number | null {
+	const parsed =
+		typeof value === "number"
+			? value
+			: typeof value === "string" && value.trim().length > 0
+				? Number(value)
+				: NaN;
+
+	if (!Number.isInteger(parsed) || parsed < 0 || parsed > MAX_NOTIFY_FILTER) {
+		return null;
+	}
+
+	return parsed;
+}
+
+export function maskDeviceToken(token: string): string {
+	if (token.length <= 10) {
+		return token;
+	}
+
+	return `${token.slice(0, 6)}...${token.slice(-4)}`;
+}
+
+export enum RequestStatus {
+	SUCCESS = "success",
+	FAIL = "fail",
+}
+
+export interface RequestLog {
+	date: Date;
+	result: unknown;
+	status: RequestStatus;
 }
