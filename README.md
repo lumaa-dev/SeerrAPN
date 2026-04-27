@@ -44,13 +44,13 @@ To make SeerrAPN work follow these steps:
 4. Run `node server/index.js` or use Docker Compose with `docker-compose.yml`
 5. Set the Seerr webhook URL as `http://localhost:3000/apn` (or with your chosen port/URL) and fill in the _Authorization Header_ with the one you chose
 
-## Subscribe using [Swiftseerr](https://d.lumaa.fr/swiftseerr)
+## Subscribe using [Swiftseerr](https://apps.lumaa.fr/app/swiftseerr)
 
 If you have a running SeerrAPN instance, or if your administrator set up one. You can subscribe to the Seerr notifications using the steps below:
 
 _Requirements_:
 
-- An iOS device running [Swiftseerr](https://d.lumaa.fr/swiftseerr)
+- An iOS device running [Swiftseerr](https://apps.lumaa.fr/app/swiftseerr)
 - The _SeerrAPN URL_ for your [Seerr](https://github.com/seerr-team/seerr) instance and the _Authorization Header_
 
 1. Allow notifications in the Settings app for Swiftseerr
