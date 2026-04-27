@@ -46,7 +46,7 @@ To make SeerrAPN work follow these steps:
 
 ## Subscribe using [Swiftseerr](https://d.lumaa.fr/swiftseerr)
 
-If you have a running SeerrAPN instance, or if you administrator set up one. You can subscribe to the Seerr notifications using the steps below:
+If you have a running SeerrAPN instance, or if your administrator set up one. You can subscribe to the Seerr notifications using the steps below:
 
 _Requirements_:
 
@@ -62,4 +62,4 @@ If the informations written are invalid, or if the SeerrAPN instance has issues,
 
 ---
 
-© Lumaa 2025
+© Lumaa 2025-2026
