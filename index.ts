@@ -15,6 +15,7 @@ import {
 	RequestLog,
 	RequestStatus,
 	SeerrNotification,
+	sendStaticNotification,
 	sendTypedNotification,
 } from "./utils.js";
 import express from "express";
@@ -212,6 +213,58 @@ app.post("/notify", async (req, res) => {
 	}
 });
 
+app.post("/notification", async (req, res) => {
+	if (!isAuthorized(req.headers.authorization)) {
+		return res.status(403).json({ message: "Forbidden", success: false });
+	}
+
+	if (isUnbound(req.body)) {
+		const err = "[POST /notification] Request has no body";
+		console.log(err);
+		logRequest(err, RequestStatus.FAIL);
+
+		return res
+			.status(400)
+			.json({ message: "Request has no body", success: false });
+	}
+
+	const badge = parseBadge(req.body.badge);
+	const message = parseMessage(req.body.message);
+	const deviceTokens = parseDeviceTokens(req.body.deviceTokens);
+	if (badge == null || message == null || deviceTokens == null) {
+		const err = "[POST /notification] Request is missing valid data";
+		console.log(err);
+		logRequest(err, RequestStatus.FAIL);
+
+		return res
+			.status(400)
+			.json({ message: "Request is missing valid data", success: false });
+	}
+
+	try {
+		const result = await sendStaticNotification(deviceTokens, {
+			badge,
+			message,
+		});
+
+		if (result.failed.length > 0) {
+			for (const failure of result.failed) {
+				const err = `[POST /notification] Error ${maskDeviceToken(failure.device)}: ${failure.response?.reason ?? "Unknown error"}`;
+				console.error(err);
+				logRequest(err, RequestStatus.FAIL);
+			}
+		}
+
+		const msg = `[POST /notification] Sent custom notification to ${result.sent.length} tokens`;
+		console.log(msg);
+		logRequest(msg);
+
+		return res.status(200).json({ success: true, sent: result.sent.length });
+	} catch (error) {
+		return respondWithError(res, error, "[POST /notification]");
+	}
+});
+
 // This is the URL that gets requested when a webhook is sent from Seerr
 app.post("/apn", async (req, res) => {
 	// sends notification to device (via SQL + cache)
@@ -306,6 +359,19 @@ app.post("/apn", async (req, res) => {
 	}
 });
 
+app.get("/logs", (req, res) => {
+	if (req.headers.authorization != process.env.AUTH_ADMIN) {
+		return res.status(403).json({ message: "Forbidden", success: false });
+	}
+
+	let response: { success: RequestLog[], errors: RequestLog[]; } = {
+		success: logs.filter((l) => l.status == RequestStatus.SUCCESS),
+		errors: logs.filter((l) => l.status == RequestStatus.FAIL)
+	}
+	
+	return res.status(200).json(response);
+})
+
 // MARK: - Events
 
 app.listen(process.env.PORT, () => {
@@ -335,6 +401,53 @@ function getDefaultNotifyFilter(): number {
 		NotificationFilter.requestAvailable |
 		NotificationFilter.requestDeclined
 	);
+}
+
+function parseBadge(value: unknown): number | null {
+	const parsed =
+		typeof value === "number"
+			? value
+			: typeof value === "string" && value.trim().length > 0
+				? Number(value)
+				: NaN;
+
+	if (!Number.isInteger(parsed) || parsed < 0) {
+		return null;
+	}
+
+	return parsed;
+}
+
+function parseMessage(value: unknown): string | null {
+	if (typeof value !== "string") {
+		return null;
+	}
+
+	const normalized = value.trim();
+	if (normalized.length === 0) {
+		return null;
+	}
+
+	return normalized;
+}
+
+function parseDeviceTokens(value: unknown): string | string[] | null {
+	if (typeof value === "string") {
+		return parseDeviceToken(value);
+	}
+
+	if (!Array.isArray(value) || value.length === 0) {
+		return null;
+	}
+
+	const tokens = value
+		.map((token) => parseDeviceToken(token))
+		.filter((token): token is string => token != null);
+	if (tokens.length !== value.length) {
+		return null;
+	}
+
+	return [...new Set(tokens)];
 }
 
 function logRequest(
