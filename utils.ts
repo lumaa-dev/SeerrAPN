@@ -7,7 +7,7 @@ import {
 	ResponseSent,
 	ResponseFailure,
 } from "@parse/node-apn";
-import { Pool, QueryResult, ResultSetHeader, RowDataPacket } from "mysql2";
+import { ExecuteValues, Pool, QueryResult, ResultSetHeader, RowDataPacket } from "mysql2";
 
 let provider: Provider | null = null;
 const DEFAULT_APP_BUNDLE = "fr.lumaa.Swiftseerr";
@@ -164,7 +164,7 @@ export async function hasTokened(pool: Pool, token: string): Promise<boolean> {
 export async function queryRows<T>(
 	pool: Pool,
 	query: string,
-	values: unknown[] = [],
+	values: ExecuteValues = [],
 ): Promise<T[]> {
 	const result = await runQuery(pool, query, values);
 	return result as T[];
@@ -173,7 +173,7 @@ export async function queryRows<T>(
 export async function executeStatement(
 	pool: Pool,
 	query: string,
-	values: unknown[] = [],
+	values: ExecuteValues = [],
 ): Promise<ResultSetHeader> {
 	const result = await runQuery(pool, query, values);
 	return result as ResultSetHeader;
@@ -182,7 +182,7 @@ export async function executeStatement(
 function runQuery(
 	pool: Pool,
 	query: string,
-	values: unknown[],
+	values: ExecuteValues,
 ): Promise<QueryResult> {
 	return new Promise((resolve, reject) => {
 		pool.execute(query, values, (err, result) => {
