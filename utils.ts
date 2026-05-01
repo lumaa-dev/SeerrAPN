@@ -11,7 +11,7 @@ import { ExecuteValues, Pool, QueryResult, ResultSetHeader, RowDataPacket } from
 
 let provider: Provider | null = null;
 const DEFAULT_APP_BUNDLE = "fr.lumaa.Swiftseerr";
-const DEVICE_TOKEN_PATTERN = /^[0-9a-fA-F]{64}$/;
+const DEVICE_TOKEN_PATTERN = /^[0-9a-fA-F]{64,160}$/;
 
 // MARK: - Seerr Utils
 
