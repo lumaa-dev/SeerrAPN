@@ -1,3 +1,5 @@
+import express from "express";
+import dotenv from "dotenv";
 import { timingSafeEqual } from "crypto";
 import { createPool } from "mysql2";
 import {
@@ -7,19 +9,24 @@ import {
 	hasTokened,
 	isUnbound,
 	maskDeviceToken,
+	matchesPermission,
 	NotificationFilter,
-	NotificationType,
 	parseDeviceToken,
 	parseNotifyFilter,
 	queryRows,
 	RequestLog,
 	RequestStatus,
+} from "./utils.js";
+import {
 	SeerrNotification,
 	sendStaticNotification,
 	sendTypedNotification,
-} from "./utils.js";
-import express from "express";
-import dotenv from "dotenv";
+} from "./notification.js";
+import { NotificationType } from "./seerr.js";
+import {
+	hasPermissionNotifications,
+	hasTargettedNotifications,
+} from "./config.js";
 
 // MARK: - Database
 dotenv.config();
@@ -34,14 +41,16 @@ const pool = createPool({
 });
 
 // MARK: - Express
+
 const app = express();
 app.disable("x-powered-by");
 app.use(express.urlencoded({ extended: false, limit: "16kb" }));
 app.use(express.json({ limit: "16kb" }));
 
 // MARK: - General
+
 const logs: RequestLog[] = [];
-const serviceVersion = "1.1.0";
+const serviceVersion: string = "1.2.0";
 
 app.get("/", (req, res) => {
 	if (!isAuthorized(req.headers.authorization)) {
@@ -70,7 +79,7 @@ app.post("/token", async (req, res) => {
 			.json({ message: "Request has no body", success: false });
 	}
 
-	const deviceToken = parseDeviceToken(req.body.deviceToken);
+	const deviceToken: string | null = parseDeviceToken(req.body.deviceToken);
 	if (deviceToken == null) {
 		const err = "[POST /token] Request is missing a valid device token";
 		console.log(err);
@@ -81,30 +90,41 @@ app.post("/token", async (req, res) => {
 			.json({ message: "Request is missing valid data", success: false });
 	}
 
-	const notify = parseNotifyFilter(req.body.notify) ?? getDefaultNotifyFilter();
+	const notify: number =
+		parseNotifyFilter(req.body.notify) ?? getDefaultNotifyFilter();
+	const seerrId: number = req.body.seerrId ?? 1;
+	const permissions: number = req.body.permissions ?? 0;
 
 	try {
 		if (await hasTokened(pool, deviceToken)) {
-			const err = "[POST /token] Already tokened";
-			console.log(err);
-			logRequest(err, RequestStatus.FAIL);
+			// update
 
-			return res
-				.status(400)
-				.json({ message: "Already tokened", success: false });
+			await executeStatement(
+				pool,
+				"UPDATE apn SET seerrId = ?, permissions = ? WHERE deviceToken = ?",
+				[seerrId, permissions, deviceToken],
+			);
+
+			const msg = `[POST /token] Updated info for token ${maskDeviceToken(deviceToken)} in database`;
+			console.log(msg);
+			logRequest(msg);
+
+			return res.status(200).json({ success: true });
+		} else {
+			// first time
+
+			await executeStatement(
+				pool,
+				"INSERT INTO apn (deviceToken, notify, seerrId, permissions) VALUES (?, ?, ?, ?)",
+				[deviceToken, notify, seerrId, permissions],
+			);
+
+			const msg = `[POST /token] Added token ${maskDeviceToken(deviceToken)} to database`;
+			console.log(msg);
+			logRequest(msg);
+
+			return res.status(200).json({ success: true });
 		}
-
-		await executeStatement(
-			pool,
-			"INSERT INTO apn (deviceToken, notify) VALUES (?, ?)",
-			[deviceToken, notify],
-		);
-
-		const msg = `[POST /token] Added token ${maskDeviceToken(deviceToken)} to database`;
-		console.log(msg);
-		logRequest(msg);
-
-		return res.status(200).json({ success: true });
 	} catch (error) {
 		return respondWithError(res, error, "[POST /token]");
 	}
@@ -314,7 +334,7 @@ app.post("/apn", async (req, res) => {
 	try {
 		const devices = await queryRows<DBDevice>(
 			pool,
-			"SELECT id, deviceToken, notify FROM apn",
+			"SELECT id, deviceToken, notify, seerrId, permissions FROM apn",
 		);
 		const typefilter =
 			NotificationFilter.from(typenotif) ?? NotificationFilter.none;
@@ -325,6 +345,18 @@ app.post("/apn", async (req, res) => {
 				}
 
 				return getFilters(device.notify).includes(typefilter);
+			})
+			.filter((device) => {
+				if (hasPermissionNotifications) {
+					return matchesPermission(typenotif, device.permissions);
+				}
+				return true;
+			})
+			.filter((device) => {
+				if (hasTargettedNotifications && bodytype.request != undefined) {
+					return bodytype.request!.request_id == `${device.seerrId}`;
+				}
+				return true;
 			})
 			.map((device) => device.deviceToken);
 
@@ -364,13 +396,13 @@ app.get("/logs", (req, res) => {
 		return res.status(403).json({ message: "Forbidden", success: false });
 	}
 
-	let response: { success: RequestLog[], errors: RequestLog[]; } = {
+	let response: { success: RequestLog[]; errors: RequestLog[] } = {
 		success: logs.filter((l) => l.status == RequestStatus.SUCCESS),
-		errors: logs.filter((l) => l.status == RequestStatus.FAIL)
-	}
-	
+		errors: logs.filter((l) => l.status == RequestStatus.FAIL),
+	};
+
 	return res.status(200).json(response);
-})
+});
 
 // MARK: - Events
 
@@ -473,9 +505,7 @@ function respondWithError(
 	console.error(context, error);
 	logRequest(`${context} ${message}`, RequestStatus.FAIL);
 
-	return res
-		.status(500)
-		.json({ message, success: false });
+	return res.status(500).json({ message, success: false });
 }
 
 /**
@@ -483,4 +513,5 @@ function respondWithError(
  *  id          INT AUTO_INCREMENT PRIMARY KEY,
  *  deviceToken VARCHAR(255) NOT NULL,
  *  notify      TINYINT NOT NULL
+ *  permission  TINYINT NOT NULL
  */

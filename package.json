@@ -3,9 +3,10 @@
 	"version": "1.1.0",
 	"type": "module",
 	"scripts": {
-		"dev": "node --loader ts-node/esm ./index.ts",
+		"dev": "node --loader ts-node/esm ./src/index.ts",
 		"build": "rm -rf ./server && tsc && zip SeerrAPN.zip server/* docker-compose.yml .env package.json README.md EXAMPLE.env",
-		"start": "rm -rf ./server && tsc && node server/index.js"
+		"start": "rm -rf ./server && tsc && node server/index.js",
+		"compile": "rm -rf ./server && tsc"
 	},
 	"dependencies": {
 		"@parse/node-apn": "^8.1.0",
