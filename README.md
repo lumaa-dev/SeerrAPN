@@ -10,9 +10,10 @@ SeerrAPN is an [APN](https://d.lumaa.fr/AosqMi) (Apple Push Notification) servic
 ### Events supported
 
 - New Request
+- Request Approved
 - Request Denied
-- Movie/Show Available
 - Request Automatically Approved
+- Movie/Show Available
 
 ### Filters
 
