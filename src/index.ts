@@ -95,6 +95,16 @@ app.post("/token", async (req, res) => {
 	const seerrId: number = req.body.seerrId ?? 1;
 	const permissions: number = req.body.permissions ?? 0;
 
+	if (seerrId < 0 || permissions < 0) {
+		const err = "[POST /token] Seerr ID or Permissions is below 0";
+		console.log(err);
+		logRequest(err, RequestStatus.FAIL);
+
+		return res
+			.status(400)
+			.json({ message: "Seerr ID or Permissions is below 0", success: false });
+	}
+
 	try {
 		if (await hasTokened(pool, deviceToken)) {
 			// update
